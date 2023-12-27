@@ -79,7 +79,7 @@
 
 	-- We have 4 different types of ship modes 1. Same Day 2. First Class 3. Second Class 4. Standard class
     
-# 5. Now we are checking the minimum and maximum number of days taken to ship an order ranging according to different Order_Priorities
+# 5. Now we are checking the minimum, maximum and average number of days taken to ship an order ranging according to different Order_Priorities
 
 	-- Checking the different order priorities we have. 
     
@@ -96,12 +96,136 @@
 		FROM globalstore.`globalstore.orders`
 		)
         
-        SELECT min(Numofdays),max(Numofdays) 
+        SELECT min(Numofdays),max(Numofdays),avg(Numofdays)
         FROM NUMDAYS
-        WHERE Order_Priority = 'High';
+        WHERE Order_Priority = 'Critical';
         
-        -- CRITICAL (min,max) = (0,3)
-        -- 
+        -- CRITICAL (min,max,avg) = (0,3,1.8)
+        -- HIGH 					(0,5,3.08)
+        -- MEDIUM 					(0,7,4.51)
+        -- LOW 						(6,7,6.48)
         
-        SELECT * FROM globalstore.`globalstore.orders`
+        SELECT * FROM globalstore.`globalstore.orders`;
         
+# 6. Showing Sum of Sales Region wise in descending order
+
+	SELECT Region,sum(Sales) 
+    FROM globalstore.`globalstore.orders`
+    GROUP BY Region 
+    ORDER BY sum(Sales) desc;
+    
+    -- Therefore the top 4 sales generating regions for us are Central, South, North, Oceania.
+    
+    SELECT * FROM globalstore.`globalstore.orders`;
+    
+	-- Showing sum of sales region wise and country wise
+    
+	SELECT Region,Country,sum(Sales) 
+    FROM globalstore.`globalstore.orders`
+    GROUP BY Region,Country 
+    ORDER BY Region desc;
+    
+# 7. Showing Products that have generated negative profit 
+
+	SELECT *   
+    FROM globalstore.`globalstore.orders`
+    WHERE Profit < 0;
+    
+# 8. Comparing shipping costs according to order priority and ship mode
+
+	SELECT Ship_Mode,Shipping_Cost,Order_Priority 
+    FROM globalstore.`globalstore.orders`;
+    
+    -- Now we are checking whether standard class shipping is used in orders which are critical or not
+    
+    SELECT Ship_Mode,Shipping_Cost,Order_Priority 
+    FROM globalstore.`globalstore.orders`
+    WHERE  Ship_Mode = 'Standard Class' AND Order_Priority = 'Critical';
+    
+    -- Therefore standard class shipping mode is not used for orders that are critical. 
+
+# 9. Now showing Total Sales and Profit Category wise
+
+	SELECT Category,sum(Sales),sum(Profit)
+    FROM globalstore.`globalstore.orders`
+    GROUP BY Category;
+    
+# 10. Now showing Total Sales and Profit Category and Subcategory wise
+
+	SELECT DISTINCT SubCategory
+    FROM globalstore.`globalstore.orders`;
+    
+    -- What we have done below is we are showing sales Category wise and Subcategory wise as well.
+    -- Meaning that For each category we are showing sales in descending order subcategory wise
+    
+    SELECT Category, SubCategory, sum(Sales) AS TotalSales, sum(profit) AS TotalProfit
+	FROM globalstore.`globalstore.orders`
+    GROUP BY Category,SubCategory
+    ORDER BY Category,TotalSales desc;
+    
+    SELECT * 
+	FROM globalstore.`globalstore.orders`;
+    
+# 11. What are the different markets where the stores are having the best sales?
+
+	SELECT Market,Category, SubCategory, sum(Sales) AS TotalSales, sum(profit) AS TotalProfit
+	FROM globalstore.`globalstore.orders`
+    GROUP BY Market,Category,SubCategory
+    ORDER BY Market,Category,TotalSales desc;
+    
+	SELECT * FROM globalstore.`globalstore.orders`;
+ 
+-- ------------------------------------------------------------------------------------------------------------------------------------
+# 12. CHECKING THE RETURNS TABLE
+
+	SELECT * FROM globalstore.`globalstore.returns`;
+    
+    -- Checking if any of the orders have been returned
+    
+    SELECT DISTINCT Returned
+    FROM globalstore.`globalstore.returns`;
+    
+    -- So basically all the orders have been returned and there are no pending orders to be returned
+    
+# 13. Creating a join between the returns table and orders table. 
+    
+	SELECT *
+	FROM globalstore.`globalstore.returns`
+	LEFT JOIN globalstore.`globalstore.orders`
+	ON globalstore.`globalstore.returns`.Order_ID = globalstore.`globalstore.orders`.Order_ID;
+    
+    -- Now the orders that have been returned have to be reduced from the sales and profit numbers. 
+    -- Therefore we need add a marker which indicates orders that have been returned or not.
+    
+    -- Therefore we are now using LEFT JOIN so that we get all the records from the orders table and match the records which are returned . 
+    -- This will create another column which has a returns column and through that we can sort which orders have been returned or not and accordingly use to calculate sales/profits.
+    
+	SELECT *
+    FROM globalstore.`globalstore.orders` as o
+	LEFT JOIN globalstore.`globalstore.returns` as r
+	ON o.Order_ID = r.Order_ID;
+    
+    -- Using the above result as a CTE and then showing the sales results. 
+    
+    WITH OrdersReturnsTable AS (
+	SELECT 
+		o.Order_ID,
+        o.Market,
+        o.Region,
+        o.Category,
+        o.SubCategory,
+        o.Sales,
+        o.Profit,
+        r.Returned
+    FROM globalstore.`globalstore.orders` as o
+	LEFT JOIN globalstore.`globalstore.returns` as r
+	ON o.Order_ID = r.Order_ID)
+    
+    -- We have not used */(selected all columns) as we have 2 columns having same names as Order ID therefore we have selected here
+    
+    SELECT Category, SubCategory, sum(Sales) AS TotalSales, sum(profit) AS TotalProfit
+	FROM OrdersReturnsTable
+    WHERE Returned IS NULL
+    GROUP BY Category,SubCategory
+    ORDER BY Category,TotalSales desc;
+    
